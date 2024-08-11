@@ -1,5 +1,6 @@
 const express = require('express');
-const TorrentClient = require('./class/TorrentClient');
+const TorrentClient = require('./class/MagnetClient');
+const { hasher, info, turrentstore, streamlink } = require('./class/MagnetClient');
 
 const app = express();
 
@@ -9,20 +10,18 @@ app.get('/get-stream-link', async (req, res) => {
     if (!magnet) {
         return res.status(400).json({ error: 'Magnet link is required' });
     }
-
-    const torrentClient = new TorrentClient(magnet);
-
-    if (!torrentClient.hash) {
+    const hash = await hasher(magnet);
+    if (!hash) {
         return res.status(400).json({ error: 'Invalid magnet link' });
     }
 
-    const info = await torrentClient.info();
+    const torrentInfo = await info(hash);
 
-    if (info.api && info.apikey && info.token) {
-        const status = await torrentClient.turrentstore(torrentClient.hash, new URL(info.api).host, info.token, info.apikey);
+    if (torrentInfo.api && torrentInfo.apikey && torrentInfo.token) {
+        const status = await turrentstore(hash, new URL(torrentInfo.api).host, torrentInfo.token, torrentInfo.apikey);
 
         if (status) {
-            const files = await torrentClient.streamlink(new URL(info.api).host, info.api, torrentClient.hash, info.token, info.apikey);
+            const files = await streamlink(new URL(torrentInfo.api).host, torrentInfo.api, hash, torrentInfo.token, torrentInfo.apikey);
 
             if (files) {
                 return res.json({ files });
